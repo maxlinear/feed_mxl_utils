@@ -1,0 +1,62 @@
+{
+  "images": [
+    {
+      "type": "recovery",
+      "osentryaddr": "0x80000000=0xBFF20000",
+      "targetaddr": "0x80000002=0xBFF20000",
+      "nojump": "0x80000006=0x1",
+      "rollback": "rollback=0x5",
+      "imgid" : "0x80000009=0x00000001"
+    },
+    {
+      "type": "rot",
+      "targetaddr": "0x80000002=0xBFF20000",
+      "nojump": "0x80000006=0x0"
+    },
+    {
+      "type": "firmware",
+      "osentryaddr": "0x80000000=0xBFF20000",
+      "targetaddr": "0x80000002=0xBFF20000",
+      "nojump": "0x80000006=0x1",
+      "rollback": "rollback=0x5",
+      "imgid" : "0x80000009=0x00000001"
+    },
+    {
+      "type": "tepfirmware",
+      "osentryaddr": "0x80000000=0x1000000",
+      "targetaddr": "0x80000002=0x1000000",
+      "nojump": "0x80000006=0x0",
+      "rollback": "rollback=0x4"
+    },
+    {
+      "type": "uboot",
+      "osentryaddr": "0x80000000=0x08000000",
+      "targetaddr": "0x80000002=0x08000000",
+      "nojump": "0x80000006=0x0",
+      "rollback": "rollback=0x5",
+      "imgid" : "0x80000009=0x00000003"
+    },
+    {
+      "type": "kernel",
+      "osentryaddr": "0x80000000=0x8200000",
+      "targetaddr": "0x80000002=0x8200000",
+      "nojump": "0x80000006=0x0",
+      "rollback": "rollback=0x4"
+    },
+
+    {
+      "type": "filesystem",
+      "osentryaddr": "0x80000000=0x40000000",
+      "targetaddr": "0x80000002=0x40000000",
+      "nojump": "0x80000006=0x0",
+      "rollback": "rollback=0x4"
+    },
+    {
+      "type": "flat_dt",
+      "osentryaddr": "0x80000000=0x08000000",
+      "targetaddr": "0x80000002=0x08000000",
+      "nojump": "0x80000006=0x0",
+      "rollback": "rollback=0x4"
+    }
+  ]
+}
