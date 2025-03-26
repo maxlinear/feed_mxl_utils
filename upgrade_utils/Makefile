@@ -15,8 +15,8 @@ include $(INCLUDE_DIR)/kernel.mk
 PKG_NAME:=upgrade_utils
 PKG_SOURCE_VERSION:=2.0.0.18
 PKG_SOURCE_PROTO:=git
-CONFIG_UGW_PKG_SOURCE_URL:=ssh://git@git.maxlinear.com
-PKG_PROJECT:=ugw
+CONFIG_UGW_PKG_SOURCE_URL:=ssh://git@github.com
+PKG_PROJECT:=maxlinear
 PKG_SOURCE_NAME:=upgrade_utils
 PKG_SOURCE_INNERDIR:=upgrade
 PKG_SOURCE_URL:=$(CONFIG_UGW_PKG_SOURCE_URL)/$(PKG_PROJECT)/$(PKG_SOURCE_NAME).git
