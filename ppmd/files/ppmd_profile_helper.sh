@@ -8,6 +8,10 @@ level_pm=$2
 opt_pm=$3
 #SoC ID
 soc_id="UNKNOWN"
+#currently configured power policy
+curr_policy=$(uci get ppmdcfg.global.policy_curr 2>/dev/null)
+# Define the temporary file to store p34 value
+TMP_FILE="/tmp/p34_value"
 ############################################################
 
 ############################################################
@@ -82,6 +86,45 @@ help_pm () {
 }
 ############################################################
 
+############################################################
+p34_interfaces () {
+	if [ -s "$TMP_FILE" ]; then
+		p34=$(cat "$TMP_FILE")
+	else
+		# Initialize an empty string for p34
+		p34=""
+		temp_file=$(mktemp)
+		find /sys/firmware/devicetree/base/aliases/ -type f -exec echo {} \; > "$temp_file"
+		# Process device tree files and extract network labels
+		while read -r a; do
+			alias=$(basename "$a")
+			p=$(cat "$a")
+			if [ -f "/sys/firmware/devicetree/base/$p/device_type" ]; then
+				if [ "$(cat /sys/firmware/devicetree/base/$p/device_type)" = "network" ]; then
+					if [ -f "/sys/firmware/devicetree/base/$p/p34x-xpcs-node" ]; then
+						if [[ "$alias" == eth0_* ]]; then
+							label=$(cat /sys/firmware/devicetree/base/$p/label)
+							# Append label properly to the variable
+							if [ -z "$p34" ]; then
+								p34="$alias:$label"
+							else
+								p34="$p34,$alias:$label"
+							fi
+						fi
+					fi
+				fi
+			fi
+		done < "$temp_file"
+		rm "$temp_file"
+		# Store the final p34 value in the temporary file
+		if [ -n "$p34" ]; then
+			echo "$p34" > "$TMP_FILE"
+		else
+			echo "No valid p34 values found."
+		fi
+	fi
+}
+############################################################
 
 ############################################################
 # wlan power saving feature(s)
@@ -98,12 +141,8 @@ all_wlan_pm () {
 # check the antenna configuration for tx and rx
 # $1=wlan id
 radio_antenna_check () {
-	wlan_rx=`uci show wireless.radio$1.num_antennas | awk -F"'" '{print $2}'`
-	wlan_tx=$wlan_rx
-	if [ "$1" = "2" ]; then # 5GHz DFS check
-		radio6=`uci show wireless.radio6.num_antennas | awk -F"'" '{print $2}'`
-		wlan_rx=`expr $wlan_rx + $radio6`
-	fi
+	wlan_rx=iw dev wlan$1 iwlwav gCoCPower | cut -d ' ' -f3
+	wlan_tx=iw dev wlan$1 iwlwav gCoCPower | cut -d ' ' -f2
 }
 ############################################################
 
@@ -180,19 +219,33 @@ wlan_pm () {
 				if iw wlan"$nWlan" iwlwav sCoCPower 0; then
 					echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be disabled"
 				fi
-			fi
-		fi
-	elif [ "$level_pm" = "1" ]; then
-		if [ "$wav_id" = "6" ]; then
-			if iw wlan"$nWlan" iwlwav sCoCPower 0 1> /dev/null 2> /dev/null; then
-				if iw wlan"$nWlan" iwlwav sCoCPower 0; then
+			elif iw-mxl wlan"$nWlan" iwlwav sCoCPower 0 1> /dev/null 2> /dev/null; then 
+				if iw-mxl wlan"$nWlan" iwlwav sCoCPower 0; then 
 					echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be disabled"
 				fi
 			fi
-		elif [ "$wav_id" = "7" ]; then
-			if iw wlan"$nWlan" iwlwav sCoCPower 0 1> /dev/null 2> /dev/null; then
-				if iw wlan"$nWlan" iwlwav sCoCPower 0; then
-					echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be disabled"
+		fi
+	elif [ "$level_pm" = "1" ]; then
+		if [[ "$wav_id" = "6" ]] || [[ "$wav_id" = "7" ]]; then
+			if [ "$curr_policy" = "balance" ]; then
+				if iw wlan"$nWlan" iwlwav sCoCPower 0 1> /dev/null 2> /dev/null; then
+					if iw wlan"$nWlan" iwlwav sCoCPower 0; then
+						echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be disabled"
+					fi
+				elif iw-mxl wlan"$nWlan" iwlwav sCoCPower 0 1> /dev/null 2> /dev/null; then 
+					if iw-mxl wlan"$nWlan" iwlwav sCoCPower 0; then 
+						echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be disabled"
+					fi
+				fi
+			else
+				if iw wlan"$nWlan" iwlwav sCoCPower 1 1> /dev/null 2> /dev/null; then
+					if iw wlan"$nWlan" iwlwav sCoCPower 1; then
+						echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be enabled"
+					fi
+				elif iw-mxl wlan"$nWlan" iwlwav sCoCPower 1 1> /dev/null 2> /dev/null; then 
+					if iw-mxl wlan"$nWlan" iwlwav sCoCPower 1; then 
+						echo "wlan$nWlan power saving feature (Auto-CoC-MiMo-Mode) will be enabled"
+					fi
 				fi
 			fi
 		fi
@@ -206,7 +259,41 @@ wlan_pm () {
 			if [ -n "$radio_pcie_id" ]; then
 				echo "Disable wlan$nWlan. Force device into low power mode"
 				radio_pcie_id=`cat /tmp/radio_pcie_map.txt | grep "wlan$nWlan " | awk -F '/' '{for(i=1;i<=NF;i++){ if($i ~ ".pcie$") print $i } }'`
-				wifi down radio$nWlan
+				software=`version.sh | grep Software | cut -d ' ' -f2 | cut -d '-' -f1`
+				if [ "$software" = "UGW" ]; then
+					wifi down radio$nWlan
+				elif [ "$software" = "UPDK" ]; then
+					if [ "$nWlan" = "0" ]; then
+						ubus call WiFi.Radio.1 _set '{"parameters": {"Enable": "0"}}'
+					elif [ "$nWlan" = "2" ]; then
+						ubus call WiFi.Radio.2 _set '{"parameters": {"Enable": "0"}}'
+					elif [ "$nWlan" = "4" ]; then
+						ubus call WiFi.Radio.3 _set '{"parameters": {"Enable": "0"}}'
+					else
+						echo "Invalid radio id"
+						return
+					fi
+				else
+					software=`cat /version | grep DISTRO | cut -d '"' -f2 | grep "rdkb"`
+					if [ "$software" = "rdkb" ]; then
+						if [ "$nWlan" = "0" ]; then
+							dmcli eRT setv Device.WiFi.Radio.1.Enable bool false
+							dmcli eRT setv Device.WiFi.ApplyRadioSettings bool true
+						elif [ "$nWlan" = "2" ]; then
+							dmcli eRT setv Device.WiFi.Radio.2.Enable bool false
+							dmcli eRT setv Device.WiFi.ApplyRadioSettings bool true
+						elif [ "$nWlan" = "4" ]; then
+							dmcli eRT setv Device.WiFi.Radio.3.Enable bool false
+							dmcli eRT setv Device.WiFi.ApplyRadioSettings bool true
+						else
+							echo "Invalid radio id"
+							return
+						fi
+					else
+						echo "Invlid"
+						return
+					fi
+				fi
 				sleep 3
 				echo -n $radio_pcie_id > $pcie_path/unbind
 			fi
@@ -233,7 +320,25 @@ wlan_pm () {
 			fi
 			echo "Enable wlan$nWlan. Bring the device back into operational mode"
 			echo "We need to disable first all wifi interfaces"
-			wifi down
+			software=`version.sh | grep Software | cut -d ' ' -f2 | cut -d '-' -f1`
+			if [ "$software" = "UGW" ]; then
+				wifi down
+			elif [ "$software" = "UPDK" ]; then
+				ubus call WiFi.Radio.1 _set '{"parameters": {"Enable": "0"}}'
+				ubus call WiFi.Radio.2 _set '{"parameters": {"Enable": "0"}}'
+				ubus call WiFi.Radio.3 _set '{"parameters": {"Enable": "0"}}'
+			else
+				software=`cat /version | grep DISTRO | cut -d '"' -f2 | grep "rdkb"`
+				if [ "$software" = "rdkb" ]; then
+					dmcli eRT setv Device.WiFi.Radio.1.Enable bool false
+					dmcli eRT setv Device.WiFi.Radio.2.Enable bool false
+					dmcli eRT setv Device.WiFi.Radio.3.Enable bool false
+					dmcli eRT setv Device.WiFi.ApplyRadioSettings bool true
+				else
+					"Invalid"
+					return
+				fi
+			fi
 			sleep 5
 			for i in 0 2 4; do
 				if ! ls -l /sys/class/net/ | grep wlan$i 1> /dev/null; then
@@ -257,7 +362,25 @@ wlan_pm () {
 			done
 			# bring-up all wifi interfaces
 			sleep 5
-			wifi up
+			software=`version.sh | grep Software | cut -d ' ' -f2 | cut -d '-' -f1`
+			if [ "$software" = "UGW" ]; then
+				wifi up
+			elif [ "$software" = "UPDK" ]; then
+				ubus call WiFi.Radio.1 _set '{"parameters": {"Enable": "1"}}'
+				ubus call WiFi.Radio.2 _set '{"parameters": {"Enable": "1"}}'
+				ubus call WiFi.Radio.3 _set '{"parameters": {"Enable": "1"}}'
+			else
+				software=`cat /version | grep DISTRO | cut -d '"' -f2 | grep "rdkb"`
+				if [ "$software" = "rdkb" ]; then
+					dmcli eRT setv Device.WiFi.Radio.1.Enable bool true
+					dmcli eRT setv Device.WiFi.Radio.2.Enable bool true
+					dmcli eRT setv Device.WiFi.Radio.3.Enable bool true
+					dmcli eRT setv Device.WiFi.ApplyRadioSettings bool true
+				else
+					"Invalid"
+					return
+				fi
+			fi
 			sleep 7
 			echo "############# Enable WiFi done. All interfaces should be up ##########"
 			exit 0
@@ -267,6 +390,15 @@ wlan_pm () {
 			echo ""
 			echo "WLAN$nWlan:"
 			iw wlan"$nWlan" iwlwav gCoCPower
+			if ifconfig | grep -q "wlan$nWlan"; then
+				echo "wlan$nWlan in operative mode"
+			else
+				echo "wlan$nWlan in low power mode"
+			fi
+		elif iw-mxl wlan"$nWlan" iwlwav gCoCPower 1> /dev/null 2> /dev/null; then
+			echo ""
+			echo "WLAN$nWlan:"
+			iw-mxl wlan"$nWlan" iwlwav gCoCPower
 			if ifconfig | grep -q "wlan$nWlan"; then
 				echo "wlan$nWlan in operative mode"
 			else
@@ -380,10 +512,16 @@ dsl_pm () {
 # all GPHYs/ethernet ports power saving feature(s)
 # i: ethernet numbering
 all_gphy_pm () {
-	i=0
-	for i in 2 3 4 5; do
-		gphy_pm $i
-	done
+	p34_interfaces
+	if [ -n "$p34" ]; then
+		IFS=','
+		for pair in $p34; do
+			alias=$(echo "$pair" | awk -F':' '{print $1}')
+			interface_name=$(echo "$pair" | awk -F':' '{print $2}')
+			gphy_pm $alias $interface_name
+		done
+		IFS=' '
+	fi
 }
 ############################################################
 
@@ -391,16 +529,13 @@ all_gphy_pm () {
 # GPHY/Ethernet power saving feature(s)
 set_ghpy_id() {
 	case "$1" in
-		"1") echo "no valid p34x gphy id"
-			nGphy=99
+		"eth0_2") nGphy=0
 			;;
-		"2") nGphy=0
+		"eth0_3") nGphy=1
 			;;
-		"3") nGphy=1
+		"eth0_4") nGphy=2
 			;;
-		"4") nGphy=2
-			;;
-		"5") nGphy=3
+		"eth0_5") nGphy=3
 			;;
 		*) echo "Unknown eth_id"
 		   nGphy=99
@@ -412,27 +547,27 @@ set_ghpy_id() {
 ############################################################
 gphy_pm () {
 	phyctrl=`find /sys/devices/ -name \*p34x@0\*`
-	nEth=$1
+	interface_name=$2
 	set_ghpy_id $1
 	if [ "$nGphy" = "99" ]; then
 		return
 	fi
 	if [ "$level_pm" = "0" ]; then
-		ethtool --set-eee eth0_"$nEth" eee off 2> /dev/null
+		ethtool --set-eee $interface_name eee off 2> /dev/null
 	elif [ "$level_pm" = "1" ]; then
-		ethtool --set-eee eth0_"$nEth" eee on 2> /dev/null
+		ethtool --set-eee $interface_name eee on 2> /dev/null
 	elif [ "$level_pm" = "2" -a "$phyctrl" != "" ]; then
 		echo phy_power $nGphy 0 > $phyctrl/phy_control
-		echo "Disable eth0_$nEth. Force eth0_$nEth into power down mode"
+		echo "Disable $interface_name. Force $interface_name into power down mode"
 	elif [ "$level_pm" = "3" -a "$phyctrl" != "" ]; then
 		echo phy_power $nGphy 1 > $phyctrl/phy_control
-		echo "Enable eth0_$nEth. Bring eth0_$nEth back into operational mode"
+		echo "Enable $interface_name. Bring $interface_name back into operational mode"
 	elif [ "$level_pm" = "4" -a "$phyctrl" != "" ]; then
 		echo phy_lpmode $nGphy 0 > $phyctrl/phy_control
-		echo "Disable Low Power Mode for eth0_$nEth"
+		echo "Disable Low Power Mode for $interface_name"
 	elif [ "$level_pm" = "5" -a "$phyctrl" != "" ]; then
 		echo phy_lpmode $nGphy 1 > $phyctrl/phy_control
-		echo "Enable Low Power Mode for eth0_$nEth"
+		echo "Enable Low Power Mode for $interface_name"
 	else
 		echo ""
 		# low power mode
@@ -443,21 +578,21 @@ gphy_pm () {
 		if [ "$phyctrl" != "" ]; then
 			lp=`cat $phyctrl/phy_control | grep "LowPower:  gphy$nGphy" | awk '{ printf $3}'`
 			if [ "$lp" = "active" ]; then
-				echo "eth0_$nEth  LP Mode active"
+				echo "$interface_name  LP Mode active"
 				return
 			else
-				echo "eth0_$nEth  LP mode $lp"
+				echo "$interface_name  LP mode $lp"
 			fi
 			# power down
 			pd=`cat $phyctrl/phy_control | grep "PowerDown: gphy$nGphy" | awk '{ printf $3}'`
 			echo "        in $pd mode"
 		else
-			echo "eth0_$nEth"
+			echo "$interface_name"
 		fi
 		# eee mode
-		ethtool --show-eee eth0_$nEth | grep "EEE status"
+		ethtool --show-eee $interface_name | grep "EEE status"
 		# link detection
-		ethtool eth0_$nEth | grep "Link detected:"
+		ethtool $interface_name | grep "Link detected:"
 	fi
 }
 ############################################################

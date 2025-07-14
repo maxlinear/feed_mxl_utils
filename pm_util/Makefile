@@ -3,7 +3,7 @@
 # Copyright (C) 2017 Intel Corporation
 # Copyright (C) 2020-2024 MaxLinear Inc
 #
-# This is free software, licensed under the GNU General Public License v2.
+# This is a free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
 
 
@@ -11,13 +11,14 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=pm-util
-PKG_SOURCE_VERSION:=4.4.8
+PKG_VERSION:=4.4.10
+PKG_SOURCE_VERSION:=$(PKG_VERSION)
 PKG_SOURCE_PROTO:=git
-CONFIG_UGW_PKG_SOURCE_URL:=ssh://git@github.com
 PKG_PROJECT:=maxlinear
 PKG_SOURCE_NAME:=pm_util
+CONFIG_UGW_PKG_SOURCE_URL:=ssh://git@github.com
 PKG_SOURCE_URL:=$(CONFIG_UGW_PKG_SOURCE_URL)/$(PKG_PROJECT)/$(PKG_SOURCE_NAME).git
-PKG_MIRROR_HASH:=515c21b9ecf246a8be0005de8e03c7d3373a1c69f82e31108d738e799709a5c0
+PKG_MIRROR_HASH:=74ba48c1d88a5fe8a6c6a093e45564ac9220059379e0bb63c7b80a1a079015a9
 PKG_RELEASE:=1
 PKG_BIN_DIR=$(VENDOR_PATH)/bin
 PKG_BUILD_DEPENDS:=libjson-c

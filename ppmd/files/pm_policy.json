@@ -121,13 +121,13 @@
 				"cmd": "iw wlan4 iwlwav sCoCAutoCfg 10 0 0 20 30 30 30 30 30 30 -66 -69 -72 30 5 0 -3"
 			},
 			"wlan0_dyn_atenna_ena": {
-				"cmd": "iw wlan0 iwlwav sCoCPower 1"
+				"cmd": "ppmd_profile_helper.sh wlan0 1"
 			},
 			"wlan2__dyn_atenna_ena": {
-				"cmd": "iw wlan2 iwlwav sCoCPower 1"
+				"cmd": "ppmd_profile_helper.sh wlan2 1"
 			},
 			"wlan4__dyn_atenna_ena": {
-				"cmd": "iw wlan4 iwlwav sCoCPower 1"
+				"cmd": "ppmd_profile_helper.sh wlan4 1"
 			},
 			"wlan_dvs": {                              
                                 "cmd": "iw dev wlan0 iwlwav sDoSimpleCLI 150 1 0 1"           
