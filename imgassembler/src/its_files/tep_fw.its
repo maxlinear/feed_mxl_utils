@@ -1,0 +1,29 @@
+/*
+ * The image source file creates FIT image with MXL tep-firmware.
+ */
+
+/dts-v1/;
+
+/ {
+	description = "TEP firmware binary";
+	images {
+		tep {
+			description = "TEP firmware";
+			data = /incbin/("tep_fw.bin.signed.strip");
+			type = "firmware";
+			arch = "X86";
+			os = "tee";
+			compression = "none";
+			load = <0x01000000>;
+			entry = <0x01000000>;
+		};
+	};
+
+	configurations {
+		default = "conf";
+		conf {
+			description = "Default configuration";
+			loadables = "tep";
+		};
+	};
+};

@@ -1,0 +1,26 @@
+/dts-v1/;
+
+/ {
+    description = "U-Boot binary";
+    images {
+        uboot {
+            description = "MXL U-Boot";
+            data = /incbin/("u-boot-without-signing.lzimg.signed");
+            type = "firmware";
+            arch = "X86";
+            os = "u-boot";
+	    compression = "lzma";
+            load = <0x08200000>;
+            entry = <0x08200000>;
+        };
+    };
+
+    configurations {
+        default = "conf";
+        conf {
+            description = "Default configuration";
+            loadables = "uboot";
+        };
+    };
+};
+
