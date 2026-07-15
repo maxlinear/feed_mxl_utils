@@ -203,7 +203,7 @@ wlan_pm () {
 	pcie_path=`find /sys/bus/platform/drivers/ -name \*-pcie`
 	# save the pcie memory address related to the wifi radio
 	# save if only one time to get the default config
-	if [ ! -f /tmp/radio_pcie_map.txt ]; then	
+	if [ ! -s /tmp/radio_pcie_map.txt ]; then
 		ls -al /sys/class/net/ | grep "wlan0 " 1> /tmp/radio_pcie_map.txt 2> /dev/null
 		ls -al /sys/class/net/ | grep "wlan2 " 1>> /tmp/radio_pcie_map.txt 2> /dev/null
 		ls -al /sys/class/net/ | grep "wlan4 " 1>> /tmp/radio_pcie_map.txt 2> /dev/null
