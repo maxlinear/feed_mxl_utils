@@ -13,7 +13,7 @@ include $(INCLUDE_DIR)/kernel.mk
 
 #### Package Info ############################### 
 PKG_NAME:=secure_upgrade_utils
-PKG_SOURCE_VERSION:=3.0.6
+PKG_SOURCE_VERSION:=3.0.7
 PKG_VERSION:=$(PKG_SOURCE_VERSION)
 PKG_SOURCE_PROTO:=git
 PKG_PROJECT:=maxlinear
